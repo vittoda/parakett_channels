@@ -1,8 +1,6 @@
 package com.flowstack.channels.slack;
 
-import java.util.LinkedList;
-import java.util.List;
-
+import com.fasterxml.jackson.databind.JsonNode;
 import com.flowstack.channels.base.CommChannelException;
 import com.flowstack.channels.base.CommChannelInstance;
 import com.flowstack.channels.base.MessageContext;
@@ -11,8 +9,13 @@ import com.flowstack.channels.base.OutputMessage;
 
 public class SlackChannelInstance implements CommChannelInstance {
 
-    private List<OnMessageHandler> _mMessageHandlers = new LinkedList<>();
+    private OnMessageHandler _mMessageHandler = null;
     private SlackConnection _mConnection = null;
+    private JsonNode _mConfig = null;
+
+    public SlackChannelInstance(JsonNode config) {
+        _mConfig = config;
+    }
 
     @Override
     public void sendMessage(OutputMessage msg) throws CommChannelException {
@@ -22,18 +25,18 @@ public class SlackChannelInstance implements CommChannelInstance {
 
     @Override
     public void registerOnMessageHandler(OnMessageHandler handler) {
-        _mMessageHandlers.add(handler);
+        _mMessageHandler = handler;
     }
 
     @Override
     public void initialize() throws CommChannelException {
-        _mConnection = new SlackConnection();
+        _mConnection = new SlackConnection(_mConfig);
         _mConnection.initialize();
         _mConnection.setMessageReceiveHandler(new MessageReceiveHandler() {
             public void onMessageReceived(String message, String userId, String channel, String threadId) {
-                for (OnMessageHandler handler : _mMessageHandlers) {
+                if (_mMessageHandler != null) {
                     SlackInputMessage sm = new SlackInputMessage(message, userId, channel, threadId);
-                    OutputMessage om = handler.onMessageReceived(sm);
+                    OutputMessage om = _mMessageHandler.onMessageReceived(sm);
                     if (om != null) {
                         _mConnection.sendMessage(channel, om.getText(), threadId);
                     }
@@ -43,16 +46,16 @@ public class SlackChannelInstance implements CommChannelInstance {
         });
     }
 
-     /*
-     * This will be used for Human In Loop messages from agent. The message will need to be responded in the same thread. 
-       This one later can be changed to a proper workflow in slack.
+    /*
+     * This will be used for Human In Loop messages from agent. The message will
+     * need to be responded in the same thread.
+     * This one later can be changed to a proper workflow in slack.
      */
     @Override
-    public void getConfirmationResponse(MessageContext context, String message, String responseKey, String requestId) throws CommChannelException {
-        SlackMessageContext slackContext = (SlackMessageContext)context;
-        _mConnection.triggerBlockForGettingResponse(slackContext.channelId, message,requestId,responseKey);
+    public void getConfirmationResponse(MessageContext context, String message, String responseKey, String requestId)
+            throws CommChannelException {
+        SlackMessageContext slackContext = (SlackMessageContext) context;
+        _mConnection.triggerBlockForGettingResponse(slackContext.channelId, message, requestId, responseKey);
     }
 
-
-   
 }

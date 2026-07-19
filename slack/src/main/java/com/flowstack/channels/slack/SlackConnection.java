@@ -11,6 +11,7 @@ import com.slack.api.model.event.MessageEvent;
 
 import java.io.IOException;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.flowstack.channels.base.CommChannelException;
 import com.flowstack.channels.base.JsonUtils;
@@ -27,8 +28,10 @@ public class SlackConnection {
     private static final String ACTION_APPROVE = "ACTION_APPROVE";
     private static final String ACTION_DENY = "ACTION_DENY";
 
-    SlackConnection() {
+    private JsonNode _mConfig = null;
 
+    SlackConnection(JsonNode config) {
+        _mConfig = config;
     }
 
     public void setMessageReceiveHandler(MessageReceiveHandler handler) {
@@ -39,18 +42,38 @@ public class SlackConnection {
         String botToken = null;
         String appToken = null;
 
-        LocalKeyManager lm = new LocalKeyManager();
-        try {
-            String k = lm.getKeyValue("slack.channel.config");
-            if (k == null) {
-                throw new CommChannelException("Key not found.");
+        // Check if the config has credentials. If not get from local key manager.
+        if (_mConfig != null) {
+            if (_mConfig.has("credentials")) {
+                ObjectNode creds = (ObjectNode) _mConfig.get("credentials");
+                botToken = creds.get("botToken").asText();
+                appToken = creds.get("appToken").asText();
             }
-            // TODO: Validate key values as well.
-            ObjectNode on = (ObjectNode) JsonUtils.MAPPER.readTree(k);
-            botToken = on.get("botToken").asText();
-            appToken = on.get("appToken").asText();
-        } catch (IOException e) {
-            throw new CommChannelException("Error loading the keys");
+        }
+
+        if (appToken == null || appToken == null) {
+            LocalKeyManager lm = new LocalKeyManager();
+            try {
+                
+                String credKey = "slack.channel.config";
+                if(_mConfig.has("credentialsKey")) {
+                    credKey = _mConfig.get("credentialsKey").asText();
+                }
+                String k = lm.getKeyValue(credKey);
+                if (k == null) {
+                    throw new CommChannelException("Local key manager could not find credentials. Credential key used '"+credKey+"'");
+                }
+                // TODO: Validate key values as well.
+                ObjectNode on = (ObjectNode) JsonUtils.MAPPER.readTree(k);
+                botToken = on.get("botToken").asText();
+                appToken = on.get("appToken").asText();
+            } catch (IOException e) {
+                throw new CommChannelException("Error loading the keys");
+            }
+        }
+
+        if(appToken == null || botToken == null) {
+            throw new CommChannelException("botToken or appToken is not defined. Stack channel cannot be used.");
         }
 
         AppConfig appConfig = AppConfig.builder()
@@ -85,8 +108,6 @@ public class SlackConnection {
         try {
 
             SocketModeApp socketModeApp = new SocketModeApp(appToken, app);
-            System.out.println("Slack Bot is starting in Socket Mode...");
-
             Thread.startVirtualThread(() -> {
                 try {
                     socketModeApp.start();
@@ -188,7 +209,7 @@ public class SlackConnection {
                             true);
 
                     try {
-                         //Show the block, without buttons.
+                        // Show the block, without buttons.
                         ctx.respond(res -> res
                                 .replaceOriginal(true) // This tells Slack to overwrite the existing message
                                 .blocks(Blocks.asBlocks(
@@ -199,7 +220,7 @@ public class SlackConnection {
                                                 String.format("~*Attention:*~\n\n~*" + message
                                                         + "*~\n\n🟢 *Approved by <@%s>*", userId))))
 
-                        )));
+                                )));
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -223,7 +244,7 @@ public class SlackConnection {
                             false);
 
                     try {
-                        //Show the block, without buttons.
+                        // Show the block, without buttons.
                         ctx.respond(res -> res
                                 .replaceOriginal(true) // This tells Slack to overwrite the existing message
                                 .blocks(Blocks.asBlocks(
@@ -232,8 +253,7 @@ public class SlackConnection {
                                         Blocks.divider(),
                                         Blocks.section(s -> s.text(BlockCompositions.markdownText(
                                                 String.format("~*Attention:*~\n\n~*" + message
-                                                        + "*~\n\n🟢 *Approved by <@%s>*", userId))))
-                        )));
+                                                        + "*~\n\n🟢 *Approved by <@%s>*", userId)))))));
                     } catch (Exception e) {
                         e.printStackTrace();
                     }

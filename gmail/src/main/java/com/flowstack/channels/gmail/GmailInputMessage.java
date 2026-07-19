@@ -16,5 +16,11 @@ public class GmailInputMessage extends InputMessage {
     public MessageContext getContext() {
         return _mContext;
     }
+
+
+    @Override
+    public String getText() {
+        return "Subject : "+ _mContext.subject+"\nSender : "+_mContext.senderEmail+"\nBody : \n"+super.getText();
+    }
     
 }

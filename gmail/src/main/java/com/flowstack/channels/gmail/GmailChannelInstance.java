@@ -41,7 +41,7 @@ public class GmailChannelInstance implements CommChannelInstance {
 
     @Override
     public void sendMessage(OutputMessage msg) throws CommChannelException {
-        throw new CommChannelException("GMaail channel does not support sending messages as of now.");
+        // TODO:Ignore for now.
     }
 
     @Override
@@ -130,8 +130,10 @@ public class GmailChannelInstance implements CommChannelInstance {
         // TODO: Ignore it when there are not handlers registered.
         try {
             long oneMinuteAgo = (System.currentTimeMillis() / 1000) - 600;
+            String url = "https://gmail.googleapis.com/gmail/v1/users/me/messages?q=after:" + oneMinuteAgo
+                    + "%20label:inbox";
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://gmail.googleapis.com/gmail/v1/users/me/messages?q=after:" + oneMinuteAgo))
+                    .uri(URI.create(url))
                     .header("Authorization", "Bearer " + GmailAuth.INSTANCE.getAccessToken())
                     .GET()
                     .build();

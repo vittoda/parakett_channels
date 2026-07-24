@@ -3,7 +3,7 @@ plugins {
     id 'maven-publish'
 }
 
-group = 'com.flowstack.channels'
+group = 'com.parakett.channels'
 version = '1.0.0'
 
 java {
